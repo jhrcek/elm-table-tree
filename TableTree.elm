@@ -43,6 +43,7 @@ type Msg
     | BlobPasted String
     | ChangeRowCount Int
     | ChangeColumnCount Int
+    | SwapColumns Int Int
 
 
 initialModel : Model
@@ -107,6 +108,9 @@ update msg model =
         ChangeColumnCount delta ->
             { model | columnCount = clamp 0 10 <| model.columnCount + delta }
 
+        SwapColumns col1 col2 ->
+            { model | cells = swapColumns col1 col2 model.cells }
+
 
 updateCellValue : Maybe String -> Maybe String
 updateCellValue mayCell =
@@ -130,6 +134,24 @@ parseBlob str =
         List.map (String.split ",") rows
 
 
+swapColumns : Int -> Int -> Cells -> Cells
+swapColumns from to cells =
+    let
+        swapColIndex ( ( a, b ), val ) =
+            ( ( a
+              , if b == from then
+                    to
+                else if b == to then
+                    from
+                else
+                    b
+              )
+            , val
+            )
+    in
+        Dict.toList cells |> List.map swapColIndex |> Dict.fromList
+
+
 
 --- VIEW
 
@@ -138,7 +160,26 @@ view : Model -> Html.Html Msg
 view model =
     let
         renderTable =
-            Html.table [] (List.map renderRow [0..model.rowCount - 1])
+            Html.table [] <|
+                [ renderHeader ]
+                    ++ (List.map renderRow [0..model.rowCount - 1])
+
+        renderHeader =
+            Html.tr [] (List.map renderHeaderCell [0..model.columnCount - 1])
+
+        renderHeaderCell col =
+            Html.th []
+                ((if col > 0 then
+                    [ Html.span [ onClick (SwapColumns col (col - 1)) ] [ text "◀ " ] ]
+                  else
+                    []
+                 )
+                    ++ (if col <= (model.columnCount - 2) then
+                            [ Html.span [ onClick (SwapColumns col (col + 1)) ] [ text " ▶" ] ]
+                        else
+                            []
+                       )
+                )
 
         renderRow row =
             Html.tr [] (List.map (renderCell row) [0..model.columnCount - 1])
@@ -177,7 +218,7 @@ view model =
         Html.div []
             [ renderTable
             , controls
-            , Html.textarea [ onInput BlobPasted ] []
+            , Html.textarea [ onInput BlobPasted, A.rows 5, A.cols 40 ] []
             , Html.hr [] []
             , Html.text <| toString model
             ]
