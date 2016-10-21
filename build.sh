@@ -1,2 +1,2 @@
 #!/bin/bash
-elm make TableTree.elm --output elm.js
+elm make Main.elm --output elm.js

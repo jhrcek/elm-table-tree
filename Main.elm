@@ -1,4 +1,4 @@
-module TableTree exposing (..)
+module Main exposing (..)
 
 import Html exposing (text)
 import Html.Attributes as A
@@ -7,6 +7,7 @@ import Html.Events exposing (onInput, targetValue, onClick, onBlur)
 import Debug exposing (log)
 import String
 import Dict exposing (Dict)
+import TreeBuilder
 
 
 main : Program Never
@@ -50,21 +51,25 @@ initialModel : Model
 initialModel =
     { cells =
         Dict.fromList
-            [ ( 0, 0 ) => "one"
-            , ( 1, 0 ) => "two"
-            , ( 2, 0 ) => "three"
-            , ( 3, 0 ) => "four"
-            , ( 0, 1 ) => "10"
-            , ( 1, 1 ) => "20"
+            [ ( 0, 0 ) => "Jan"
+            , ( 0, 1 ) => "30"
+            , ( 0, 2 ) => "Programmer"
+            , ( 0, 3 ) => "male"
+            , ( 1, 0 ) => "Jane"
+            , ( 1, 1 ) => "40"
+            , ( 1, 2 ) => "Shop assistant"
+            , ( 1, 3 ) => "female"
+            , ( 2, 0 ) => "Dan"
             , ( 2, 1 ) => "30"
+            , ( 2, 2 ) => "Worker"
+            , ( 2, 3 ) => "male"
+            , ( 3, 0 ) => "Lydia"
             , ( 3, 1 ) => "40"
-            , ( 0, 2 ) => "foo"
-            , ( 1, 2 ) => "bar"
-            , ( 2, 2 ) => "baz"
-            , ( 3, 2 ) => "quux"
+            , ( 3, 2 ) => "Clerk"
+            , ( 3, 3 ) => "female"
             ]
     , rowCount = 4
-    , columnCount = 3
+    , columnCount = 4
     , blob = []
     , editedCell = Nothing
     }
@@ -152,6 +157,19 @@ swapColumns from to cells =
         Dict.toList cells |> List.map swapColIndex |> Dict.fromList
 
 
+cellsToRecords : Int -> Int -> Cells -> List (List String)
+cellsToRecords rowCount columnCount cells =
+    List.map
+        (\row ->
+            List.map
+                (\column ->
+                    Maybe.withDefault "<empty>" <| Dict.get ( row, column ) cells
+                )
+                [0..columnCount - 1]
+        )
+        [0..rowCount - 1]
+
+
 
 --- VIEW
 
@@ -218,7 +236,8 @@ view model =
         Html.div []
             [ renderTable
             , controls
-            , Html.textarea [ onInput BlobPasted, A.rows 5, A.cols 40 ] []
+              --  , Html.textarea [ onInput BlobPasted, A.rows 5, A.cols 40 ] []
+            , TreeBuilder.drawTree <| TreeBuilder.buildTree "<root>" <| cellsToRecords model.rowCount model.columnCount model.cells
             , Html.hr [] []
             , Html.text <| toString model
             ]
