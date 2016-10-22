@@ -4,7 +4,7 @@ import Html exposing (text)
 import Html.Attributes as A
 import Html.App
 import Html.Events exposing (onInput, targetValue, onClick, onBlur)
-import Debug exposing (log)
+import Debug
 import String
 import Dict exposing (Dict)
 import TreeBuilder
@@ -27,11 +27,14 @@ type alias Cells =
     Dict ( Int, Int ) String
 
 
+type alias Records =
+    List (List String)
+
+
 type alias Model =
     { cells : Cells
     , rowCount : Int
     , columnCount : Int
-    , blob : List (List String)
     , editedCell : Maybe ( Int, Int )
     }
 
@@ -49,30 +52,16 @@ type Msg
 
 initialModel : Model
 initialModel =
-    { cells =
-        Dict.fromList
-            [ ( 0, 0 ) => "Jan"
-            , ( 0, 1 ) => "30"
-            , ( 0, 2 ) => "Programmer"
-            , ( 0, 3 ) => "male"
-            , ( 1, 0 ) => "Jane"
-            , ( 1, 1 ) => "40"
-            , ( 1, 2 ) => "Shop assistant"
-            , ( 1, 3 ) => "female"
-            , ( 2, 0 ) => "Dan"
-            , ( 2, 1 ) => "30"
-            , ( 2, 2 ) => "Worker"
-            , ( 2, 3 ) => "male"
-            , ( 3, 0 ) => "Lydia"
-            , ( 3, 1 ) => "40"
-            , ( 3, 2 ) => "Clerk"
-            , ( 3, 3 ) => "female"
-            ]
+    { cells = blobToCells initialBlob
     , rowCount = 4
     , columnCount = 4
-    , blob = []
     , editedCell = Nothing
     }
+
+
+initialBlob : String
+initialBlob =
+    "Jan,33,Tester,male\nJane,40,Shop assistant,female\nDan,60,Professor,male\nLydia,40,Clerk,female"
 
 
 getValueAt : Int -> Int -> Cells -> String
@@ -90,8 +79,8 @@ update msg model =
         NoOp ->
             model
 
-        BlobPasted str ->
-            { model | blob = parseBlob str }
+        BlobPasted blob ->
+            { model | cells = blobToCells blob }
 
         CellClicked row col ->
             { model | editedCell = Just ( row, col ) }
@@ -130,15 +119,6 @@ updateCellValue mayCell =
             Just s
 
 
-parseBlob : String -> List (List String)
-parseBlob str =
-    let
-        rows =
-            String.split "\n" str
-    in
-        List.map (String.split ",") rows
-
-
 swapColumns : Int -> Int -> Cells -> Cells
 swapColumns from to cells =
     let
@@ -157,17 +137,50 @@ swapColumns from to cells =
         Dict.toList cells |> List.map swapColIndex |> Dict.fromList
 
 
-cellsToRecords : Int -> Int -> Cells -> List (List String)
+recordsToCells : Records -> Cells
+recordsToCells records =
+    let
+        maximumLength =
+            Maybe.withDefault 0 <| List.maximum <| List.map List.length records
+
+        paddedRecords =
+            List.map (\xs -> xs ++ List.repeat (maximumLength - List.length xs) "") records
+    in
+        List.indexedMap (\rowIdx record -> List.indexedMap (\colIdx cellValue -> ( ( rowIdx, colIdx ), cellValue )) record) paddedRecords
+            |> List.concat
+            |> Dict.fromList
+
+
+blobToCells : String -> Cells
+blobToCells =
+    blobToRecords >> recordsToCells
+
+
+cellsToRecords : Int -> Int -> Cells -> Records
 cellsToRecords rowCount columnCount cells =
     List.map
         (\row ->
             List.map
                 (\column ->
-                    Maybe.withDefault "<empty>" <| Dict.get ( row, column ) cells
+                    Maybe.withDefault "" <| Dict.get ( row, column ) cells
                 )
                 [0..columnCount - 1]
         )
         [0..rowCount - 1]
+
+
+blobToRecords : String -> Records
+blobToRecords str =
+    let
+        rows =
+            String.split "\n" str
+    in
+        List.map (String.split ",") rows
+
+
+recordsToBlob : Records -> String
+recordsToBlob records =
+    String.join "\n" <| List.map (String.join ",") records
 
 
 
@@ -225,28 +238,25 @@ view model =
                 else
                     Html.text valString
 
-        controls =
+        tableControls =
             Html.div []
                 [ Html.button [ onClick (ChangeRowCount 1) ] [ text "Add row" ]
                 , Html.button [ onClick (ChangeRowCount -1) ] [ text "Remove row" ]
                 , Html.button [ onClick (ChangeColumnCount 1) ] [ text "Add  column" ]
                 , Html.button [ onClick (ChangeColumnCount -1) ] [ text "Remove column" ]
                 ]
+
+        records =
+            cellsToRecords model.rowCount model.columnCount model.cells
     in
         Html.div []
-            [ renderTable
-            , controls
-              --  , Html.textarea [ onInput BlobPasted, A.rows 5, A.cols 40 ] []
-            , TreeBuilder.drawTree <| TreeBuilder.buildTree "<root>" <| cellsToRecords model.rowCount model.columnCount model.cells
+            [ Html.h2 [] [ Html.text "CSV Data" ]
+            , Html.textarea [ onInput BlobPasted, A.rows model.rowCount, A.cols 40, A.value (recordsToBlob records), A.placeholder "Paste CSV data here ..." ] []
+            , Html.h2 [] [ Html.text "Parsed Data" ]
+            , tableControls
+            , renderTable
+            , Html.h2 [] [ Html.text "Tree View" ]
+            , TreeBuilder.drawTree <| TreeBuilder.buildTree "<root>" records
             , Html.hr [] []
             , Html.text <| toString model
             ]
-
-
-
--- HELPERS
-
-
-(=>) : a -> b -> ( a, b )
-(=>) a b =
-    ( a, b )
