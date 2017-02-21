@@ -2,7 +2,6 @@ module Main exposing (..)
 
 import Html exposing (text)
 import Html.Attributes as A
-import Html.App
 import Html.Events exposing (onInput, targetValue, onClick, onBlur)
 import Debug
 import String
@@ -10,9 +9,9 @@ import Dict exposing (Dict)
 import TreeBuilder
 
 
-main : Program Never
+main : Program Never Model Msg
 main =
-    Html.App.beginnerProgram
+    Html.beginnerProgram
         { model = initialModel
         , update = update
         , view = view
@@ -164,9 +163,9 @@ cellsToRecords rowCount columnCount cells =
                 (\column ->
                     Maybe.withDefault "" <| Dict.get ( row, column ) cells
                 )
-                [0..columnCount - 1]
+                (List.range 0 (columnCount - 1))
         )
-        [0..rowCount - 1]
+        (List.range 0 (rowCount - 1))
 
 
 blobToRecords : String -> Records
@@ -193,10 +192,10 @@ view model =
         renderTable =
             Html.table [] <|
                 [ renderHeader ]
-                    ++ (List.map renderRow [0..model.rowCount - 1])
+                    ++ (List.map renderRow (List.range 0 (model.rowCount - 1)))
 
         renderHeader =
-            Html.tr [] (List.map renderHeaderCell [0..model.columnCount - 1])
+            Html.tr [] (List.map renderHeaderCell (List.range 0 (model.columnCount - 1)))
 
         renderHeaderCell col =
             Html.th []
@@ -213,7 +212,7 @@ view model =
                 )
 
         renderRow row =
-            Html.tr [] (List.map (renderCell row) [0..model.columnCount - 1])
+            Html.tr [] (List.map (renderCell row) (List.range 0 (model.columnCount - 1)))
 
         renderCell row col =
             Html.td

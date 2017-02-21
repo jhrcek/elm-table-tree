@@ -1,6 +1,6 @@
 module TreeBuilder exposing (drawTree, buildTree, groupByHead)
 
-import Svg exposing (Svg, svg, circle, line, g, text', text)
+import Svg exposing (Svg, svg, circle, line, g, text_, text)
 import Svg.Attributes exposing (..)
 import TreeDiagram exposing (node, Tree, defaultTreeLayout, leftToRight)
 import TreeDiagram.Svg
@@ -24,7 +24,7 @@ drawNode label =
     g
         []
         [ circle [ r "16", stroke "black", fill "white", cx "0", cy "0" ] []
-        , text' [ textAnchor "middle", transform "translate(0,5)" ] [ text label ]
+        , text_ [ textAnchor "middle", transform "translate(0,5)" ] [ text label ]
         ]
 
 
@@ -52,7 +52,7 @@ buildForest xss =
             (\group ->
                 let
                     groupLabel =
-                        Maybe.andThen (List.head group) List.head
+                        Maybe.andThen List.head (List.head group)
 
                     tailsToBeGrouped : List (List String)
                     tailsToBeGrouped =
@@ -83,7 +83,7 @@ groupByHead =
                     [ [ xs ] ]
 
                 ys :: yss ->
-                    if List.head xs == ((List.head ys) `Maybe.andThen` List.head) then
+                    if List.head xs == ((List.head ys) |> Maybe.andThen List.head) then
                         ((xs :: ys) :: yss)
                     else
                         [ xs ] :: (ys :: yss)
