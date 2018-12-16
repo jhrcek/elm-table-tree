@@ -2,16 +2,19 @@
 <html>
 
 <head>
-    <meta charset="UTF-8">
-    <title>Elm table-tree</title>
-    <script type="text/javascript" src="elm.js"></script>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <title>Elm table-tree</title>
+  <script type="text/javascript" src="elm.js"></script>
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <script>
-        Elm.Main.fullscreen();
-    </script>
+  <div id="elm"></div>
+  <script>
+    Elm.Main.init({
+      node: document.getElementById("elm")
+    });
+  </script>
 </body>
 
 </html>
