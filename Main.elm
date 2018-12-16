@@ -1,19 +1,22 @@
 module Main exposing (main)
 
 import Browser
+import Browser.Dom as Dom
 import Dict exposing (Dict)
 import Html exposing (Html, button, div, h2, input, span, table, td, text, textarea, th, tr)
 import Html.Attributes as A
 import Html.Events exposing (onBlur, onClick, onInput)
 import String
+import Task
 import TreeBuilder
 
 
 main : Program () Model Msg
 main =
-    Browser.sandbox
-        { init = initialModel
+    Browser.element
+        { init = init
         , update = update
+        , subscriptions = always Sub.none
         , view = view
         }
 
@@ -42,15 +45,18 @@ type Msg
     | ChangeRowCount Int
     | ChangeColumnCount Int
     | SwapColumns Int Int
+    | NoOp
 
 
-initialModel : Model
-initialModel =
-    { cells = blobToCells initialBlob
-    , rowCount = 4
-    , columnCount = 4
-    , editedCell = Nothing
-    }
+init : () -> ( Model, Cmd Msg )
+init _ =
+    ( { cells = blobToCells initialBlob
+      , rowCount = 4
+      , columnCount = 4
+      , editedCell = Nothing
+      }
+    , Cmd.none
+    )
 
 
 initialBlob : String
@@ -63,29 +69,34 @@ getValueAt row col cells =
     Dict.get ( row, col ) cells |> Maybe.withDefault ""
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         BlobPasted blob ->
-            { model | cells = blobToCells blob }
+            ( { model | cells = blobToCells blob }, Cmd.none )
 
         CellClicked row col ->
-            { model | editedCell = Just ( row, col ) }
+            ( { model | editedCell = Just ( row, col ) }
+            , Task.attempt (always NoOp) (Dom.focus (toCellId row col))
+            )
 
         CellLostFocus ->
-            { model | editedCell = Nothing }
+            ( { model | editedCell = Nothing }, Cmd.none )
 
         CellTyped row col str ->
-            { model | cells = Dict.insert ( row, col ) str model.cells }
+            ( { model | cells = Dict.insert ( row, col ) str model.cells }, Cmd.none )
 
         ChangeRowCount delta ->
-            { model | rowCount = model.rowCount + delta }
+            ( { model | rowCount = model.rowCount + delta }, Cmd.none )
 
         ChangeColumnCount delta ->
-            { model | columnCount = model.columnCount + delta }
+            ( { model | columnCount = model.columnCount + delta }, Cmd.none )
 
         SwapColumns col1 col2 ->
-            { model | cells = swapColumns col1 col2 model.cells }
+            ( { model | cells = swapColumns col1 col2 model.cells }, Cmd.none )
+
+        NoOp ->
+            ( model, Cmd.none )
 
 
 swapColumns : Int -> Int -> Cells -> Cells
@@ -204,7 +215,7 @@ view model =
                 input
                     [ onInput <| CellTyped row col
                     , onBlur CellLostFocus
-                    , A.id <| String.fromInt row ++ ":" ++ String.fromInt col
+                    , A.id <| toCellId row col
                     , A.value valString
                     , A.style "display" "table-cell"
                     , A.style "width" "99%"
@@ -258,3 +269,8 @@ tableControls rowCount colCount =
                 (but (ChangeColumnCount -1) "Remove column")
     in
     div [] (List.concat [ addRow, removeRow, addColumn, removeColumn ])
+
+
+toCellId : Int -> Int -> String
+toCellId row col =
+    String.fromInt row ++ ":" ++ String.fromInt col
