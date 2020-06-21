@@ -2,8 +2,9 @@ module TreeBuilder exposing (buildTree, drawTree)
 
 import Html
 import List
+import List.Extra as List
 import MyTree exposing (MyTree)
-import Svg exposing (Svg, circle, g, line, text, text_)
+import Svg exposing (Svg)
 import Svg.Attributes exposing (cx, cy, fill, r, stroke, textAnchor, transform, x1, x2, y1, y2)
 import TreeDiagram exposing (defaultTreeLayout, leftToRight)
 import TreeDiagram.Svg
@@ -13,7 +14,7 @@ import TreeDiagram.Svg
 -}
 drawLine : ( Float, Float ) -> Svg msg
 drawLine ( targetX, targetY ) =
-    line
+    Svg.line
         [ x1 "0", y1 "0", x2 (String.fromFloat targetX), y2 (String.fromFloat targetY), stroke "black" ]
         []
 
@@ -22,10 +23,10 @@ drawLine ( targetX, targetY ) =
 -}
 drawNode : String -> Svg msg
 drawNode label =
-    g
+    Svg.g
         []
-        [ circle [ r "16", stroke "black", fill "white", cx "0", cy "0" ] []
-        , text_ [ textAnchor "middle", transform "translate(0,5)" ] [ text label ]
+        [ Svg.circle [ r "16", stroke "black", fill "white", cx "0", cy "0" ] []
+        , Svg.text_ [ textAnchor "middle", transform "translate(0,5)" ] [ Svg.text label ]
         ]
 
 
@@ -45,42 +46,29 @@ buildTree rootLabel xs =
 
 buildForest : List (List String) -> List (MyTree String)
 buildForest xss =
-    let
-        xsss =
-            groupByHead <| sortByHead xss
-    in
-    List.filterMap
-        (\group ->
-            let
-                tailsToBeGrouped : List (List String)
-                tailsToBeGrouped =
-                    List.filterMap List.tail group
-            in
-            List.head group
-                |> Maybe.andThen List.head
-                |> Maybe.map (\label -> buildTree label tailsToBeGrouped)
-        )
-        xsss
+    xss
+        |> sortByHead
+        |> groupByHead
+        |> List.filterMap
+            (\( first, rest ) ->
+                List.head first
+                    |> Maybe.map
+                        (\label ->
+                            let
+                                tailsToBeGrouped : List (List String)
+                                tailsToBeGrouped =
+                                    List.filterMap List.tail <| first :: rest
+                            in
+                            buildTree label tailsToBeGrouped
+                        )
+            )
 
 
 sortByHead : List (List String) -> List (List String)
 sortByHead =
-    List.sortBy (\xs -> Maybe.withDefault "can't happen" <| List.head xs)
+    List.sortBy (\xs -> Maybe.withDefault "" <| List.head xs)
 
 
-groupByHead : List (List a) -> List (List (List a))
+groupByHead : List (List a) -> List ( List a, List (List a) )
 groupByHead =
-    let
-        f xs acc =
-            case acc of
-                [] ->
-                    [ [ xs ] ]
-
-                ys :: yss ->
-                    if List.head xs == (List.head ys |> Maybe.andThen List.head) then
-                        (xs :: ys) :: yss
-
-                    else
-                        [ xs ] :: (ys :: yss)
-    in
-    List.foldr f []
+    List.groupWhile (\xs ys -> List.head xs == List.head ys)

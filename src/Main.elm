@@ -175,17 +175,19 @@ recordsToCells records =
         |> Dict.fromList
 
 
-cellsToRecords : Int -> Int -> Cells -> Records
-cellsToRecords rowCount columnCount cells =
-    List.map
-        (\row ->
-            List.map
-                (\column ->
-                    Maybe.withDefault "" <| Dict.get ( row, column ) cells
-                )
-                (List.range 0 (columnCount - 1))
-        )
-        (List.range 0 (rowCount - 1))
+gridToRecords : Grid -> Records
+gridToRecords { rowCount, columnCount, cells } =
+    List.range 0 (rowCount - 1)
+        |> List.map
+            (\rowIdx ->
+                List.range 0 (columnCount - 1)
+                    |> List.map (\colIdx -> Dict.get ( rowIdx, colIdx ) cells |> Maybe.withDefault "")
+            )
+
+
+gridToCsv : Grid -> String
+gridToCsv =
+    gridToRecords >> List.map (String.join ",") >> String.join "\n"
 
 
 blobToRecords : String -> Records
@@ -269,22 +271,6 @@ viewError parseError =
                     ++ (String.join "," <| List.map String.fromInt ints)
 
 
-gridToCsv : Grid -> String
-gridToCsv grid =
-    List.range 0 (grid.rowCount - 1)
-        |> List.map
-            (\rowIndex ->
-                List.range 0 (grid.columnCount - 1)
-                    |> List.map
-                        (\colIndex ->
-                            Dict.get ( rowIndex, colIndex ) grid.cells
-                                |> Maybe.withDefault ""
-                        )
-                    |> String.join ","
-            )
-        |> String.join "\n"
-
-
 viewGrid : Grid -> Html Msg
 viewGrid grid =
     let
@@ -342,7 +328,7 @@ viewGrid grid =
                 Html.text valString
 
         records =
-            cellsToRecords grid.rowCount grid.columnCount grid.cells
+            gridToRecords grid
 
         myTree =
             TreeBuilder.buildTree "<root>" records
