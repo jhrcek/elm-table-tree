@@ -2,6 +2,7 @@ module TreeBuilder exposing (buildTree, drawTree)
 
 import Html
 import List
+import MyTree exposing (MyTree)
 import Svg exposing (Svg, circle, g, line, text, text_)
 import Svg.Attributes exposing (cx, cy, fill, r, stroke, textAnchor, transform, x1, x2, y1, y2)
 import TreeDiagram exposing (Tree, defaultTreeLayout, leftToRight, node)
@@ -28,21 +29,21 @@ drawNode label =
         ]
 
 
-drawTree : Tree String -> Html.Html msg
+drawTree : MyTree String -> Html.Html msg
 drawTree t =
     let
         customLayout =
             { defaultTreeLayout | orientation = leftToRight }
     in
-    TreeDiagram.Svg.draw customLayout drawNode drawLine t
+    TreeDiagram.Svg.draw customLayout drawNode drawLine <| MyTree.toDiagramTree t
 
 
-buildTree : String -> List (List String) -> Tree String
+buildTree : String -> List (List String) -> MyTree String
 buildTree rootLabel xs =
-    node rootLabel (buildForest xs)
+    MyTree.MyNode rootLabel (buildForest xs)
 
 
-buildForest : List (List String) -> List (Tree String)
+buildForest : List (List String) -> List (MyTree String)
 buildForest xss =
     let
         xsss =

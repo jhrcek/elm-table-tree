@@ -5519,6 +5519,10 @@ var $author$project$Main$SwapColumns = F2(
 	function (a, b) {
 		return {$: 6, a: a, b: b};
 	});
+var $author$project$MyTree$MyNode = F2(
+	function (a, b) {
+		return {$: 0, a: a, b: b};
+	});
 var $elm$core$Maybe$andThen = F2(
 	function (callback, maybeValue) {
 		if (!maybeValue.$) {
@@ -5594,14 +5598,6 @@ var $elm$core$Maybe$map = F2(
 			return $elm$core$Maybe$Nothing;
 		}
 	});
-var $alex_tan$elm_tree_diagram$TreeDiagram$Node = F2(
-	function (a, b) {
-		return {$: 0, a: a, b: b};
-	});
-var $alex_tan$elm_tree_diagram$TreeDiagram$node = F2(
-	function (val, children) {
-		return A2($alex_tan$elm_tree_diagram$TreeDiagram$Node, val, children);
-	});
 var $elm$core$List$sortBy = _List_sortBy;
 var $author$project$TreeBuilder$sortByHead = $elm$core$List$sortBy(
 	function (xs) {
@@ -5641,7 +5637,7 @@ var $author$project$TreeBuilder$buildForest = function (xss) {
 var $author$project$TreeBuilder$buildTree = F2(
 	function (rootLabel, xs) {
 		return A2(
-			$alex_tan$elm_tree_diagram$TreeDiagram$node,
+			$author$project$MyTree$MyNode,
 			rootLabel,
 			$author$project$TreeBuilder$buildForest(xs));
 	});
@@ -5867,6 +5863,10 @@ var $alex_tan$elm_tree_diagram$TreeDiagram$drawPositioned = F5(
 			totalWidth,
 			totalHeight,
 			A6($alex_tan$elm_tree_diagram$TreeDiagram$drawInternal, totalWidth, totalHeight, drawer, drawNode, drawLine, positionedTree));
+	});
+var $alex_tan$elm_tree_diagram$TreeDiagram$Node = F2(
+	function (a, b) {
+		return {$: 0, a: a, b: b};
 	});
 var $alex_tan$elm_tree_diagram$TreeDiagram$final = F4(
 	function (level, levelHeight, lOffset, _v0) {
@@ -6306,11 +6306,28 @@ var $author$project$TreeBuilder$drawNode = function (label) {
 };
 var $alex_tan$elm_tree_diagram$TreeDiagram$LeftToRight = 0;
 var $alex_tan$elm_tree_diagram$TreeDiagram$leftToRight = 0;
+var $alex_tan$elm_tree_diagram$TreeDiagram$node = F2(
+	function (val, children) {
+		return A2($alex_tan$elm_tree_diagram$TreeDiagram$Node, val, children);
+	});
+var $author$project$MyTree$toDiagramTree = function (_v0) {
+	var a = _v0.a;
+	var children = _v0.b;
+	return A2(
+		$alex_tan$elm_tree_diagram$TreeDiagram$node,
+		a,
+		A2($elm$core$List$map, $author$project$MyTree$toDiagramTree, children));
+};
 var $author$project$TreeBuilder$drawTree = function (t) {
 	var customLayout = _Utils_update(
 		$alex_tan$elm_tree_diagram$TreeDiagram$defaultTreeLayout,
 		{aL: $alex_tan$elm_tree_diagram$TreeDiagram$leftToRight});
-	return A4($alex_tan$elm_tree_diagram$TreeDiagram$Svg$draw, customLayout, $author$project$TreeBuilder$drawNode, $author$project$TreeBuilder$drawLine, t);
+	return A4(
+		$alex_tan$elm_tree_diagram$TreeDiagram$Svg$draw,
+		customLayout,
+		$author$project$TreeBuilder$drawNode,
+		$author$project$TreeBuilder$drawLine,
+		$author$project$MyTree$toDiagramTree(t));
 };
 var $author$project$Main$getValueAt = F3(
 	function (row, col, cells) {
@@ -6404,6 +6421,14 @@ var $elm$html$Html$Attributes$rows = function (n) {
 		_VirtualDom_attribute,
 		'rows',
 		$elm$core$String$fromInt(n));
+};
+var $elm$core$List$sum = function (numbers) {
+	return A3($elm$core$List$foldl, $elm$core$Basics$add, 0, numbers);
+};
+var $author$project$MyTree$size = function (_v0) {
+	var children = _v0.b;
+	return 1 + $elm$core$List$sum(
+		A2($elm$core$List$map, $author$project$MyTree$size, children));
 };
 var $elm$html$Html$span = _VirtualDom_node('span');
 var $elm$virtual_dom$VirtualDom$style = _VirtualDom_style;
@@ -6578,6 +6603,7 @@ var $author$project$Main$view = function (model) {
 				renderRow,
 				A2($elm$core$List$range, 0, model.t - 1))));
 	var records = A3($author$project$Main$cellsToRecords, model.t, model.j, model.m);
+	var myTree = A2($author$project$TreeBuilder$buildTree, '<root>', records);
 	return A2(
 		$elm$html$Html$div,
 		_List_Nil,
@@ -6616,10 +6642,11 @@ var $author$project$Main$view = function (model) {
 				_List_Nil,
 				_List_fromArray(
 					[
-						$elm$html$Html$text('Tree View')
+						$elm$html$Html$text(
+						'Tree View (' + ($elm$core$String$fromInt(
+							$author$project$MyTree$size(myTree)) + ' nodes)'))
 					])),
-				$author$project$TreeBuilder$drawTree(
-				A2($author$project$TreeBuilder$buildTree, '<root>', records))
+				$author$project$TreeBuilder$drawTree(myTree)
 			]));
 };
 var $author$project$Main$main = $elm$browser$Browser$element(

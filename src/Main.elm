@@ -3,9 +3,10 @@ module Main exposing (main)
 import Browser
 import Browser.Dom as Dom
 import Dict exposing (Dict)
-import Html exposing (Html, button, div, h2, input, span, table, td, text, textarea, th, tr)
+import Html exposing (Html)
 import Html.Attributes as A
-import Html.Events exposing (onBlur, onClick, onInput)
+import Html.Events as Events
+import MyTree
 import String
 import Task
 import TreeBuilder
@@ -61,7 +62,10 @@ init _ =
 
 initialBlob : String
 initialBlob =
-    "Jan,33,Tester,male\nJane,40,Shop assistant,female\nDan,60,Professor,male\nLydia,40,Clerk,female"
+    """Jan,33,Tester,male
+Jane,40,Shop assistant,female
+Dan,60,Professor,male
+Lydia,40,Clerk,female"""
 
 
 getValueAt : Int -> Int -> Cells -> String
@@ -173,23 +177,23 @@ view : Model -> Html Msg
 view model =
     let
         renderTable =
-            table [] <|
+            Html.table [] <|
                 renderHeader
                     :: List.map renderRow (List.range 0 (model.rowCount - 1))
 
         renderHeader =
-            tr [] <| List.map renderHeaderCell <| List.range 0 (model.columnCount - 1)
+            Html.tr [] <| List.map renderHeaderCell <| List.range 0 (model.columnCount - 1)
 
         renderHeaderCell col =
-            th []
+            Html.th []
                 ((if col > 0 then
-                    [ span [ onClick <| SwapColumns col (col - 1) ] [ text "◀ " ] ]
+                    [ Html.span [ Events.onClick <| SwapColumns col (col - 1) ] [ Html.text "◀ " ] ]
 
                   else
                     []
                  )
                     ++ (if col < model.columnCount - 1 then
-                            [ span [ onClick <| SwapColumns col (col + 1) ] [ text " ▶" ] ]
+                            [ Html.span [ Events.onClick <| SwapColumns col (col + 1) ] [ Html.text " ▶" ] ]
 
                         else
                             []
@@ -197,11 +201,11 @@ view model =
                 )
 
         renderRow row =
-            tr [] <| List.map (renderCell row) <| List.range 0 (model.columnCount - 1)
+            Html.tr [] <| List.map (renderCell row) <| List.range 0 (model.columnCount - 1)
 
         renderCell row col =
-            td
-                [ onClick (CellClicked row col)
+            Html.td
+                [ Events.onClick (CellClicked row col)
                 , A.style "width" <| (String.fromInt <| 100 // model.columnCount) ++ "%"
                 ]
                 [ renderValue row col ]
@@ -212,9 +216,9 @@ view model =
                     getValueAt row col model.cells
             in
             if model.editedCell == Just ( row, col ) then
-                input
-                    [ onInput <| CellTyped row col
-                    , onBlur CellLostFocus
+                Html.input
+                    [ Events.onInput <| CellTyped row col
+                    , Events.onBlur CellLostFocus
                     , A.id <| toCellId row col
                     , A.value valString
                     , A.style "display" "table-cell"
@@ -223,19 +227,22 @@ view model =
                     []
 
             else
-                text valString
+                Html.text valString
 
         records =
             cellsToRecords model.rowCount model.columnCount model.cells
+
+        myTree =
+            TreeBuilder.buildTree "<root>" records
     in
-    div []
-        [ h2 [] [ text "CSV Data" ]
-        , textarea [ onInput BlobPasted, A.rows model.rowCount, A.cols 40, A.value (recordsToBlob records), A.placeholder "Paste CSV data here ..." ] []
-        , h2 [] [ text "Parsed Data" ]
+    Html.div []
+        [ Html.h2 [] [ Html.text "CSV Data" ]
+        , Html.textarea [ Events.onInput BlobPasted, A.rows model.rowCount, A.cols 40, A.value (recordsToBlob records), A.placeholder "Paste CSV data here ..." ] []
+        , Html.h2 [] [ Html.text "Parsed Data" ]
         , tableControls model.rowCount model.columnCount
         , renderTable
-        , h2 [] [ text "Tree View" ]
-        , TreeBuilder.drawTree <| TreeBuilder.buildTree "<root>" records
+        , Html.h2 [] [ Html.text <| "Tree View (" ++ String.fromInt (MyTree.size myTree) ++ " nodes)" ]
+        , TreeBuilder.drawTree myTree
         ]
 
 
@@ -243,7 +250,7 @@ tableControls : Int -> Int -> Html Msg
 tableControls rowCount colCount =
     let
         but msg txt =
-            button [ onClick msg ] [ text txt ]
+            Html.button [ Events.onClick msg ] [ Html.text txt ]
 
         createButtonIf cond btn =
             if cond then
@@ -268,7 +275,7 @@ tableControls rowCount colCount =
             createButtonIf (colCount > 0)
                 (but (ChangeColumnCount -1) "Remove column")
     in
-    div [] (List.concat [ addRow, removeRow, addColumn, removeColumn ])
+    Html.div [] (List.concat [ addRow, removeRow, addColumn, removeColumn ])
 
 
 toCellId : Int -> Int -> String
