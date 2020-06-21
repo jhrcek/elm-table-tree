@@ -5,7 +5,7 @@ import List
 import MyTree exposing (MyTree)
 import Svg exposing (Svg, circle, g, line, text, text_)
 import Svg.Attributes exposing (cx, cy, fill, r, stroke, textAnchor, transform, x1, x2, y1, y2)
-import TreeDiagram exposing (Tree, defaultTreeLayout, leftToRight, node)
+import TreeDiagram exposing (defaultTreeLayout, leftToRight)
 import TreeDiagram.Svg
 
 

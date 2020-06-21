@@ -6,6 +6,7 @@ import Dict exposing (Dict)
 import Html exposing (Html)
 import Html.Attributes as A
 import Html.Events as Events
+import List.Extra as List
 import MyTree
 import String
 import Task
@@ -31,6 +32,17 @@ type alias Records =
 
 
 type alias Model =
+    { parsedGrid : Result ParseError Grid
+    , csv : String
+    }
+
+
+type ParseError
+    = NotEnoughRows
+    | NumberOfColumnsNotTheSame (List Int)
+
+
+type alias Grid =
     { cells : Cells
     , rowCount : Int
     , columnCount : Int
@@ -42,7 +54,7 @@ type Msg
     = CellTyped Int Int String
     | CellClicked Int Int
     | CellLostFocus
-    | BlobPasted String
+    | CsvInputChanged String
     | ChangeRowCount Int
     | ChangeColumnCount Int
     | SwapColumns Int Int
@@ -51,17 +63,15 @@ type Msg
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { cells = blobToCells initialBlob
-      , rowCount = 4
-      , columnCount = 4
-      , editedCell = Nothing
+    ( { parsedGrid = parseGrid initCsv
+      , csv = initCsv
       }
     , Cmd.none
     )
 
 
-initialBlob : String
-initialBlob =
+initCsv : String
+initCsv =
     """Jan,33,Tester,male
 Jane,40,Shop assistant,female
 Dan,60,Professor,male
@@ -76,31 +86,66 @@ getValueAt row col cells =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        BlobPasted blob ->
-            ( { model | cells = blobToCells blob }, Cmd.none )
-
-        CellClicked row col ->
-            ( { model | editedCell = Just ( row, col ) }
-            , Task.attempt (always NoOp) (Dom.focus (toCellId row col))
+        CsvInputChanged csv ->
+            ( { model
+                | csv = csv
+                , parsedGrid = parseGrid csv
+              }
+            , Cmd.none
             )
 
+        CellClicked row col ->
+            withParsedGrid
+                (\grid ->
+                    ( { grid | editedCell = Just ( row, col ) }
+                    , Task.attempt (always NoOp) (Dom.focus (toCellId row col))
+                    )
+                )
+                model
+
         CellLostFocus ->
-            ( { model | editedCell = Nothing }, Cmd.none )
+            withParsedGridPure (\grid -> { grid | editedCell = Nothing }) model
 
         CellTyped row col str ->
-            ( { model | cells = Dict.insert ( row, col ) str model.cells }, Cmd.none )
+            withParsedGridPure (\grid -> { grid | cells = Dict.insert ( row, col ) str grid.cells }) model
 
         ChangeRowCount delta ->
-            ( { model | rowCount = model.rowCount + delta }, Cmd.none )
+            withParsedGridPure (\grid -> { grid | rowCount = grid.rowCount + delta }) model
 
         ChangeColumnCount delta ->
-            ( { model | columnCount = model.columnCount + delta }, Cmd.none )
+            withParsedGridPure (\grid -> { grid | columnCount = grid.columnCount + delta }) model
 
         SwapColumns col1 col2 ->
-            ( { model | cells = swapColumns col1 col2 model.cells }, Cmd.none )
+            withParsedGridPure (\grid -> { grid | cells = swapColumns col1 col2 grid.cells }) model
 
         NoOp ->
             ( model, Cmd.none )
+
+
+withParsedGrid : (Grid -> ( Grid, Cmd Msg )) -> Model -> ( Model, Cmd Msg )
+withParsedGrid f model =
+    case model.parsedGrid of
+        Ok grid ->
+            let
+                ( newGrid, cmd ) =
+                    f grid
+            in
+            ( { model | parsedGrid = Ok newGrid }, cmd )
+
+        Err _ ->
+            ( model, Cmd.none )
+
+
+withParsedGridPure : (Grid -> Grid) -> Model -> ( Model, Cmd Msg )
+withParsedGridPure f model =
+    ( case model.parsedGrid of
+        Ok grid ->
+            { model | parsedGrid = Ok <| f grid }
+
+        Err _ ->
+            model
+    , Cmd.none
+    )
 
 
 swapColumns : Int -> Int -> Cells -> Cells
@@ -125,21 +170,9 @@ swapColumns from to cells =
 
 recordsToCells : Records -> Cells
 recordsToCells records =
-    let
-        maximumLength =
-            Maybe.withDefault 0 <| List.maximum <| List.map List.length records
-
-        paddedRecords =
-            List.map (\xs -> xs ++ List.repeat (maximumLength - List.length xs) "") records
-    in
-    List.indexedMap (\rowIdx record -> List.indexedMap (\colIdx cellValue -> ( ( rowIdx, colIdx ), cellValue )) record) paddedRecords
+    List.indexedMap (\rowIdx record -> List.indexedMap (\colIdx cellValue -> ( ( rowIdx, colIdx ), cellValue )) record) records
         |> List.concat
         |> Dict.fromList
-
-
-blobToCells : String -> Cells
-blobToCells =
-    blobToRecords >> recordsToCells
 
 
 cellsToRecords : Int -> Int -> Cells -> Records
@@ -164,9 +197,33 @@ blobToRecords str =
     List.map (String.split ",") rows
 
 
-recordsToBlob : Records -> String
-recordsToBlob records =
-    String.join "\n" <| List.map (String.join ",") records
+parseGrid : String -> Result ParseError Grid
+parseGrid csv =
+    let
+        records =
+            blobToRecords csv
+
+        allLinesHaveSameNumberOfColumns =
+            List.length (List.unique <| List.map List.length records) == 1
+    in
+    case records of
+        [] ->
+            Err NotEnoughRows
+
+        firstRow :: _ ->
+            if String.isEmpty csv then
+                Err NotEnoughRows
+
+            else if not allLinesHaveSameNumberOfColumns then
+                Err <| NumberOfColumnsNotTheSame <| List.map List.length records
+
+            else
+                Ok
+                    { cells = recordsToCells records
+                    , rowCount = List.length records
+                    , columnCount = List.length firstRow
+                    , editedCell = Nothing
+                    }
 
 
 
@@ -175,14 +232,69 @@ recordsToBlob records =
 
 view : Model -> Html Msg
 view model =
+    Html.div []
+        [ Html.h2 [] [ Html.text "CSV Data" ]
+        , Html.textarea
+            [ Events.onInput CsvInputChanged
+            , A.rows 5
+            , A.cols 40
+            , A.value <|
+                case model.parsedGrid of
+                    Ok grid ->
+                        gridToCsv grid
+
+                    Err _ ->
+                        model.csv
+            , A.placeholder "Paste CSV data here ..."
+            ]
+            []
+        , case model.parsedGrid of
+            Ok grid ->
+                viewGrid grid
+
+            Err e ->
+                viewError e
+        ]
+
+
+viewError : ParseError -> Html a
+viewError parseError =
+    Html.text <|
+        case parseError of
+            NotEnoughRows ->
+                "You need to enter at least one row"
+
+            NumberOfColumnsNotTheSame ints ->
+                "All rows should have the same number of columns, but your rows have the following number of columns: "
+                    ++ (String.join "," <| List.map String.fromInt ints)
+
+
+gridToCsv : Grid -> String
+gridToCsv grid =
+    List.range 0 (grid.rowCount - 1)
+        |> List.map
+            (\rowIndex ->
+                List.range 0 (grid.columnCount - 1)
+                    |> List.map
+                        (\colIndex ->
+                            Dict.get ( rowIndex, colIndex ) grid.cells
+                                |> Maybe.withDefault ""
+                        )
+                    |> String.join ","
+            )
+        |> String.join "\n"
+
+
+viewGrid : Grid -> Html Msg
+viewGrid grid =
     let
         renderTable =
             Html.table [] <|
                 renderHeader
-                    :: List.map renderRow (List.range 0 (model.rowCount - 1))
+                    :: List.map renderRow (List.range 0 (grid.rowCount - 1))
 
         renderHeader =
-            Html.tr [] <| List.map renderHeaderCell <| List.range 0 (model.columnCount - 1)
+            Html.tr [] <| List.map renderHeaderCell <| List.range 0 (grid.columnCount - 1)
 
         renderHeaderCell col =
             Html.th []
@@ -192,7 +304,7 @@ view model =
                   else
                     []
                  )
-                    ++ (if col < model.columnCount - 1 then
+                    ++ (if col < grid.columnCount - 1 then
                             [ Html.span [ Events.onClick <| SwapColumns col (col + 1) ] [ Html.text " ▶" ] ]
 
                         else
@@ -201,21 +313,21 @@ view model =
                 )
 
         renderRow row =
-            Html.tr [] <| List.map (renderCell row) <| List.range 0 (model.columnCount - 1)
+            Html.tr [] <| List.map (renderCell row) <| List.range 0 (grid.columnCount - 1)
 
         renderCell row col =
             Html.td
                 [ Events.onClick (CellClicked row col)
-                , A.style "width" <| (String.fromInt <| 100 // model.columnCount) ++ "%"
+                , A.style "width" <| (String.fromInt <| 100 // grid.columnCount) ++ "%"
                 ]
                 [ renderValue row col ]
 
         renderValue row col =
             let
                 valString =
-                    getValueAt row col model.cells
+                    getValueAt row col grid.cells
             in
-            if model.editedCell == Just ( row, col ) then
+            if grid.editedCell == Just ( row, col ) then
                 Html.input
                     [ Events.onInput <| CellTyped row col
                     , Events.onBlur CellLostFocus
@@ -230,16 +342,14 @@ view model =
                 Html.text valString
 
         records =
-            cellsToRecords model.rowCount model.columnCount model.cells
+            cellsToRecords grid.rowCount grid.columnCount grid.cells
 
         myTree =
             TreeBuilder.buildTree "<root>" records
     in
     Html.div []
-        [ Html.h2 [] [ Html.text "CSV Data" ]
-        , Html.textarea [ Events.onInput BlobPasted, A.rows model.rowCount, A.cols 40, A.value (recordsToBlob records), A.placeholder "Paste CSV data here ..." ] []
-        , Html.h2 [] [ Html.text "Parsed Data" ]
-        , tableControls model.rowCount model.columnCount
+        [ Html.h2 [] [ Html.text "Parsed Data" ]
+        , tableControls grid.rowCount grid.columnCount
         , renderTable
         , Html.h2 [] [ Html.text <| "Tree View (" ++ String.fromInt (MyTree.size myTree) ++ " nodes)" ]
         , TreeBuilder.drawTree myTree
