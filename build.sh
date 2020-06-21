@@ -1,2 +1,2 @@
 #!/bin/bash
-elm make Main.elm --optimize --output docs/elm.js
+elm make src/Main.elm --optimize --output docs/elm.js
